@@ -106,7 +106,7 @@ const SleepMonitoring = ({ wakeUpTime, startTime, onComplete }) => {
 
     useEffect(() => {
     // Load sound file (must be added to Xcode project)
-    const birdSound = new Sound('bird-chirps.mp3', Sound.MAIN_BUNDLE, (error) => {
+    const birdSound = new Sound('assets/bird-chirps.mp3', Sound.MAIN_BUNDLE, (error) => {
       if (error) {
         console.log('Failed to load sound:', error);
         return;

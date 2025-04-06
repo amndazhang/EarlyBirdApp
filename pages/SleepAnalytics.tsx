@@ -1,6 +1,6 @@
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Dimensions } from "react-native"
 import { LineChart } from "react-native-chart-kit"
-import { SLEEP_STAGE_COLORS } from "./SleepSetup"
+import { THEME } from "../constants"
 
 const { width } = Dimensions.get("window")
 
@@ -129,13 +129,13 @@ const SleepAnalytics = ({ sleepData, sleepRating, onReset }) => {
         colors: validStageData.map((d) => {
           switch (d.stage) {
             case "Awake":
-              return SLEEP_STAGE_COLORS.AWAKE
+              return THEME.SLEEP_STAGE_COLORS.AWAKE
             case "REM":
-              return SLEEP_STAGE_COLORS.REM
+              return THEME.SLEEP_STAGE_COLORS.REM
             case "Light":
-              return SLEEP_STAGE_COLORS.LIGHT
+              return THEME.SLEEP_STAGE_COLORS.LIGHT
             case "Deep":
-              return SLEEP_STAGE_COLORS.DEEP
+              return THEME.SLEEP_STAGE_COLORS.DEEP
             default:
               return "#CCCCCC"
           }
@@ -197,25 +197,25 @@ const SleepAnalytics = ({ sleepData, sleepRating, onReset }) => {
 
           <View style={styles.stagesContainer}>
             <View style={styles.stageItem}>
-              <View style={[styles.stageColor, { backgroundColor: SLEEP_STAGE_COLORS.AWAKE }]} />
+              <View style={[styles.stageColor, { backgroundColor: THEME.SLEEP_STAGE_COLORS.AWAKE }]} />
               <Text style={styles.stageLabel}>Awake</Text>
               <Text style={styles.stageValue}>{data.sleepStages.awake.toFixed(1)}%</Text>
             </View>
 
             <View style={styles.stageItem}>
-              <View style={[styles.stageColor, { backgroundColor: SLEEP_STAGE_COLORS.LIGHT }]} />
+              <View style={[styles.stageColor, { backgroundColor: THEME.SLEEP_STAGE_COLORS.LIGHT }]} />
               <Text style={styles.stageLabel}>Light</Text>
               <Text style={styles.stageValue}>{data.sleepStages.light.toFixed(1)}%</Text>
             </View>
 
             <View style={styles.stageItem}>
-              <View style={[styles.stageColor, { backgroundColor: SLEEP_STAGE_COLORS.DEEP }]} />
+              <View style={[styles.stageColor, { backgroundColor: THEME.SLEEP_STAGE_COLORS.DEEP }]} />
               <Text style={styles.stageLabel}>Deep</Text>
               <Text style={styles.stageValue}>{data.sleepStages.deep.toFixed(1)}%</Text>
             </View>
 
             <View style={styles.stageItem}>
-              <View style={[styles.stageColor, { backgroundColor: SLEEP_STAGE_COLORS.REM }]} />
+              <View style={[styles.stageColor, { backgroundColor: THEME.SLEEP_STAGE_COLORS.REM }]} />
               <Text style={styles.stageLabel}>REM</Text>
               <Text style={styles.stageValue}>{data.sleepStages.rem.toFixed(1)}%</Text>
             </View>
