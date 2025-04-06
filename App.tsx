@@ -1,18 +1,32 @@
 "use client"
 
 import { useState } from "react"
-import { SafeAreaView, StatusBar } from "react-native"
+import { SafeAreaView, StatusBar, View } from "react-native"
+import { NavigationContainer } from "@react-navigation/native"
+import { createBottomTabNavigator } from "@react-navigation/bottom-tabs"
+import { createNativeStackNavigator } from "@react-navigation/native-stack"
+import { Home, User, Info } from "lucide-react-native"
+
+// Import screens
 import SleepSetup from "./pages/SleepSetup"
 import SleepMonitoring from "./pages/SleepMonitoring"
 import SleepFeedback from "./pages/SleepFeedback"
 import SleepAnalytics from "./pages/SleepAnalytics"
+import AboutScreen from "./pages/AboutScreen"
+import UserProfileScreen from "./pages/UserProfileScreen"
 
-export default function App() {
+// Create navigators
+const Tab = createBottomTabNavigator()
+const HomeStack = createNativeStackNavigator()
+
+// Home stack navigator
+function HomeStackScreen() {
   const [currentPage, setCurrentPage] = useState("setup")
   const [wakeUpTime, setWakeUpTime] = useState({ hour: 7, minute: 30, amPm: "AM" })
   const [sleepData, setSleepData] = useState(null)
   const [sleepRating, setSleepRating] = useState(null)
   const [startTime, setStartTime] = useState(null)
+  const [sleepCycles, setSleepCycles] = useState(5)
 
   // Function to navigate between pages
   const navigateTo = (page) => {
@@ -20,8 +34,9 @@ export default function App() {
   }
 
   // Function to start sleep monitoring
-  const startSleepMonitoring = (time) => {
+  const startSleepMonitoring = (time, cycles = null) => {
     setWakeUpTime(time)
+    if (cycles) setSleepCycles(cycles)
     setStartTime(new Date())
     navigateTo("monitoring")
   }
@@ -48,7 +63,14 @@ export default function App() {
       case "setup":
         return <SleepSetup onStartSleep={startSleepMonitoring} />
       case "monitoring":
-        return <SleepMonitoring wakeUpTime={wakeUpTime} startTime={startTime} onComplete={completeSleep} />
+        return (
+          <SleepMonitoring
+            wakeUpTime={wakeUpTime}
+            startTime={startTime}
+            sleepCycles={sleepCycles}
+            onComplete={completeSleep}
+          />
+        )
       case "feedback":
         return <SleepFeedback onSubmit={saveRating} />
       case "analytics":
@@ -59,10 +81,41 @@ export default function App() {
   }
 
   return (
-    <>
+    <View style={{ flex: 1, backgroundColor: THEME.DARK }}>
       <StatusBar barStyle="light-content" />
-      <SafeAreaView style={{ flex: 1, backgroundColor: "#1A1A1A" }}>{renderPage()}</SafeAreaView>
-    </>
+      <SafeAreaView style={{ flex: 1 }}>{renderPage()}</SafeAreaView>
+    </View>
+  )
+}
+
+export default function App() {
+  return (
+    <NavigationContainer>
+      <Tab.Navigator
+        screenOptions={({ route }) => ({
+          tabBarIcon: ({ focused, color, size }) => {
+            if (route.name === "Home") {
+              return <Home size={size} color={color} />
+            } else if (route.name === "About") {
+              return <Info size={size} color={color} />
+            } else if (route.name === "Profile") {
+              return <User size={size} color={color} />
+            }
+          },
+          tabBarActiveTintColor: THEME.PRIMARY,
+          tabBarInactiveTintColor: "gray",
+          tabBarStyle: {
+            backgroundColor: THEME.DARK,
+            borderTopColor: "rgba(255,255,255,0.1)",
+          },
+          headerShown: false,
+        })}
+      >
+        <Tab.Screen name="About" component={AboutScreen} />
+        <Tab.Screen name="Home" component={HomeStackScreen} />
+        <Tab.Screen name="Profile" component={UserProfileScreen} />
+      </Tab.Navigator>
+    </NavigationContainer>
   )
 }
 
