@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions, Modal } from "react-native"
+import Sound from 'react-native-sound';
 
 const { width, height } = Dimensions.get("window")
 
@@ -9,43 +10,39 @@ const { width, height } = Dimensions.get("window")
 const mockEegData = {
   getCurrentSleepStage: () => {
     const stages = ["Awake", "Light", "Deep", "REM"]
-    return stages[Math.floor(Math.random() * stages.length)]
+    return stages[Math.floor(Math.random() * stages.length)] // TODO:
   },
-  getPredictedWakeTime: (targetTime) => {
-    // Get the current time for reference
-    const now = new Date()
-    const startTime = new Date() // Using now as the start time
+    getPredictedWakeTime: (targetTime) => {
+      const now = new Date();
 
-    // Parse target time
-    let targetHour = targetTime.hour
-    if (targetTime.amPm === "PM" && targetHour !== 12) {
-      targetHour += 12
-    } else if (targetTime.amPm === "AM" && targetHour === 12) {
-      targetHour = 0
-    }
+      // Convert target time to 24-hour format
+      let targetHour = targetTime.hour;
+      if (targetTime.amPm === "PM" && targetHour !== 12) {
+        targetHour += 12;
+      } else if (targetTime.amPm === "AM" && targetHour === 12) {
+        targetHour = 0;
+      }
 
-    // Create a target date with the specified time
-    const targetDate = new Date()
-    targetDate.setHours(targetHour)
-    targetDate.setMinutes(targetTime.minute)
-    targetDate.setSeconds(0)
+      // Construct the full target date
+      const targetDate = new Date();
+      targetDate.setHours(targetHour);
+      targetDate.setMinutes(targetTime.minute);
+      targetDate.setSeconds(0);
+      targetDate.setMilliseconds(0);
 
-    // If the target time is before the current time, move it to the next day
-    if (targetDate < startTime) {
-      targetDate.setDate(targetDate.getDate() + 1)
-    }
+      // If target is earlier than now, assume next day
+      if (targetDate <= now) {
+        targetDate.setDate(now);
+      }
 
-    // Random offset between -10 and +5 minutes for natural variation
-    const offsetMinutes = Math.floor(Math.random() * 16) - 10
-    targetDate.setMinutes(targetDate.getMinutes() + offsetMinutes)
+      // Clamp: ensure predicted time is between target - 90 AND target
+      const minTime = new Date(targetDate.getTime() - 90 * 60 * 1000);
+      const maxTime = new Date(targetDate.getTime);
 
-    // Ensure the predicted time is still after start time even with offset
-    if (targetDate < startTime) {
-      targetDate.setTime(startTime.getTime() + 10 * 60 * 1000) // At least 10 minutes after start
-    }
-
-    return targetDate
-  },
+      if (targetDate < minTime) return minTime;
+      if (targetDate > maxTime) return maxTime;
+      return targetDate;
+    },
   getSleepQuality: () => {
     return Math.floor(Math.random() * 100)
   },
@@ -101,51 +98,62 @@ const SleepMonitoring = ({ wakeUpTime, startTime, onComplete }) => {
 
     return `${hours}:${minutes < 10 ? "0" + minutes : minutes} ${ampm}`
   }
+    
+    Sound.setCategory('Playback');
 
-  // Load alarm sound
-  useEffect(() => {
-    const loadSound = async () => {
-      try {
-        // This is a placeholder - in a real app, you would load the bird chirp sound
-        // const { sound: birdSound } = await Audio.Sound.createAsync(
-        //   require('../assets/sounds/bird-chirps.mp3')
-        // );
-        // sound.current = birdSound;
-      } catch (error) {
-        console.error("Error loading sound", error)
+    const soundRef = useRef(null);
+    const [alarmTimeout, setAlarmTimeout] = useState(null);
+
+    useEffect(() => {
+    // Load sound file (must be added to Xcode project)
+    const birdSound = new Sound('bird-chirps.mp3', Sound.MAIN_BUNDLE, (error) => {
+      if (error) {
+        console.log('Failed to load sound:', error);
+        return;
       }
-    }
-
-    loadSound()
+      soundRef.current = birdSound;
+      console.log('Sound loaded');
+    });
 
     return () => {
-      if (sound.current) {
-        sound.current.unloadAsync()
+      if (soundRef.current) {
+        soundRef.current.release(); // properly release native resources
+        console.log('Sound released');
       }
-    }
-  }, [])
-
-  // Play alarm sound
-  const playAlarm = async () => {
-    try {
-      if (sound.current) {
-        await sound.current.playAsync()
+      if (alarmTimeout) {
+        clearTimeout(alarmTimeout);
       }
-    } catch (error) {
-      console.error("Error playing sound", error)
-    }
-  }
+    };
+    }, []);
 
-  const stopAlarm = async () => {
-    try {
-      if (sound.current) {
-        await sound.current.stopAsync()
-      }
-    } catch (error) {
-      console.error("Error stopping sound", error)
+    const playAlarm = () => {
+    if (soundRef.current) {
+      soundRef.current.play((success) => {
+        if (!success) {
+          console.log('Failed to play sound');
+        } else {
+          console.log('Sound played');
+        }
+      });
     }
-  }
+    };
 
+    const stopAlarm = () => {
+    if (soundRef.current && soundRef.current.isPlaying()) {
+      soundRef.current.stop(() => {
+        console.log('Alarm stopped');
+      });
+    }
+    };
+
+    const setAlarm = (delayInMs) => {
+    const timeout = setTimeout(() => {
+      playAlarm();
+    }, delayInMs);
+    setAlarmTimeout(timeout);
+    console.log(`Alarm set for ${delayInMs / 1000} seconds`);
+    };
+    
   // Update elapsed time and sleep data with less frequent recalculations
   useEffect(() => {
     const start = startTime || new Date()
@@ -329,7 +337,7 @@ const SleepMonitoring = ({ wakeUpTime, startTime, onComplete }) => {
         style={[styles.wakeButton, alarmTriggered && styles.alarmActiveButton]}
         onPress={handleStopAlarm}
       >
-        <Text style={styles.wakeButtonText}>{alarmTriggered ? "Alarm Active - Wake Up Now" : "Wake Up Now"}</Text>
+        <Text style={styles.wakeButtonText}>{alarmTriggered ? "Alarm Active" : "Wake Up Now"}</Text>
       </TouchableOpacity>
 
       <Text style={styles.infoText}>
@@ -516,7 +524,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   wakeUpButton: {
-    backgroundColor: "#2ecc71",
+    backgroundColor: "#E74C3C",
     paddingVertical: 12,
     paddingHorizontal: 30,
     borderRadius: 8,
