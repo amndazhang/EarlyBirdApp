@@ -1,255 +1,203 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Dimensions, Animated, TextInput } from "react-native"
+import { useState, useEffect } from "react"
+import { View, Text, TouchableOpacity, StyleSheet } from "react-native"
+import { useNavigation } from "@react-navigation/native"
+import AsyncStorage from "@react-native-async-storage/async-storage"
+import * as Notifications from "expo-notifications"
+import { calculateWakeTime } from "../utils/timeCalculations"
 
-const { width } = Dimensions.get("window")
-const ITEM_HEIGHT = 50
+const SleepSetup = () => {
+  const navigation = useNavigation()
+  const [selectedCycle, setSelectedCycle] = useState(null)
+  const [notificationScheduled, setNotificationScheduled] = useState(false)
 
-// Sleep stage colors - consistent across all pages
-export const SLEEP_STAGE_COLORS = {
-  AWAKE: "#E0E0E0",
-  LIGHT: "#7B68EE",
-  DEEP: "#483D8B",
-  REM: "#9370DB",
-}
-
-const SleepSetup = ({ onStartSleep }) => {
-  const [selectedHour, setSelectedHour] = useState(7)
-  const [selectedMinute, setSelectedMinute] = useState(30)
-  const [selectedAmPm, setSelectedAmPm] = useState("AM")
-  const [activeOption, setActiveOption] = useState("wakeup") // "wakeup" or "sleepnow"
-
+  // Mock variables for directHour, directMinute, and directAmPm
   const [directHour, setDirectHour] = useState("7")
-  const [directMinute, setDirectMinute] = useState("30")
+  const [directMinute, setDirectMinute] = useState("0")
   const [directAmPm, setDirectAmPm] = useState("AM")
 
-  // Refs for scroll views
-  const hourScrollRef = useRef(null)
-  const minuteScrollRef = useRef(null)
-  const amPmScrollRef = useRef(null)
-
-  // Animation value for option switching
-  const optionAnimation = useRef(new Animated.Value(0)).current
-
-  // Generate time options
-  const hours = Array.from({ length: 12 }, (_, i) => i + 1)
-  const minutes = Array.from({ length: 12 }, (_, i) => i * 5)
-  const amPmOptions = ["AM", "PM"]
-
-  // Direct input handlers
-  const handleHourChange = (text) => {
-    const numericValue = text.replace(/[^0-9]/g, "")
-    if (numericValue === "") {
-      setDirectHour("")
-    } else {
-      const hourValue = Number.parseInt(numericValue, 10)
-      if (hourValue >= 1 && hourValue <= 12) {
-        setDirectHour(numericValue)
-        setSelectedHour(hourValue)
-      }
-    }
-  }
-
-  const handleMinuteChange = (text) => {
-    const numericValue = text.replace(/[^0-9]/g, "")
-    if (numericValue === "") {
-      setDirectMinute("")
-    } else {
-      const minuteValue = Number.parseInt(numericValue, 10)
-      if (minuteValue >= 0 && minuteValue <= 59) {
-        setDirectMinute(numericValue)
-        setSelectedMinute(minuteValue)
-      }
-    }
-  }
-
-  // Calculate sleep cycles (typically 90 minutes each)
-  const calculateOptimalWakeTime = () => {
-    const now = new Date()
-    // Add 5-6 sleep cycles (7.5-9 hours)
-    const cycles = 5 + Math.round(Math.random()) // 5 or 6 cycles
-    const wakeTime = new Date(now.getTime() + cycles * 90 * 60 * 1000)
-
-    const wakeHour = wakeTime.getHours() % 12 || 12 // Convert to 12-hour format
-    const wakeMinute = Math.floor(wakeTime.getMinutes() / 5) * 5 // Round to nearest 5 minutes
-    const wakeAmPm = wakeTime.getHours() >= 12 ? "PM" : "AM"
-
-    return { hour: wakeHour, minute: wakeMinute, amPm: wakeAmPm }
-  }
-
-  const handleSetAlarm = () => {
-    const hour = Number.parseInt(directHour || "12", 10)
-    const minute = Number.parseInt(directMinute || "0", 10)
-
-    onStartSleep({
-      hour,
-      minute,
-      amPm: directAmPm,
-    })
-  }
-
-  const handleSleepNow = () => {
-    const optimalWakeTime = calculateOptimalWakeTime()
-    onStartSleep(optimalWakeTime)
-  }
-
-  const switchOption = (option) => {
-    setActiveOption(option)
-    Animated.timing(optionAnimation, {
-      toValue: option === "wakeup" ? 0 : 1,
-      duration: 300,
-      useNativeDriver: false,
-    }).start()
-  }
-
-  // Scroll to selected values when component mounts
   useEffect(() => {
-    if (hourScrollRef.current) {
-      hourScrollRef.current.scrollTo({ y: hours.indexOf(selectedHour) * ITEM_HEIGHT, animated: false })
-    }
-    if (minuteScrollRef.current) {
-      minuteScrollRef.current.scrollTo({ y: minutes.indexOf(selectedMinute) * ITEM_HEIGHT, animated: false })
-    }
-    if (amPmScrollRef.current) {
-      amPmScrollRef.current.scrollTo({ y: amPmOptions.indexOf(selectedAmPm) * ITEM_HEIGHT, animated: false })
-    }
+    checkNotificationStatus()
   }, [])
 
-  // Handle scroll end for hour picker
-  const handleHourScroll = (event) => {
-    const y = event.nativeEvent.contentOffset.y
-    const index = Math.round(y / ITEM_HEIGHT)
-    const hour = hours[Math.min(Math.max(index, 0), hours.length - 1)]
-    setSelectedHour(hour)
+  const checkNotificationStatus = async () => {
+    const scheduled = await AsyncStorage.getItem("notificationScheduled")
+    setNotificationScheduled(scheduled === "true")
   }
 
-  // Handle scroll end for minute picker
-  const handleMinuteScroll = (event) => {
-    const y = event.nativeEvent.contentOffset.y
-    const index = Math.round(y / ITEM_HEIGHT)
-    const minute = minutes[Math.min(Math.max(index, 0), minutes.length - 1)]
-    setSelectedMinute(minute)
+  const scheduleNotification = async (wakeUpTime) => {
+    try {
+      const trigger = new Date(wakeUpTime)
+      const now = new Date()
+
+      if (trigger <= now) {
+        console.log("Wake-up time is in the past. Adjusting for tomorrow.")
+        trigger.setDate(trigger.getDate() + 1) // Set for tomorrow if in the past
+      }
+
+      const notificationId = await Notifications.scheduleNotificationAsync({
+        content: {
+          title: "Time to Wake Up! ⏰",
+          body: "Your EarlyBird alarm is going off!",
+          sound: "default",
+        },
+        trigger,
+      })
+
+      await AsyncStorage.setItem("notificationId", notificationId)
+      await AsyncStorage.setItem("notificationScheduled", "true")
+      setNotificationScheduled(true)
+      console.log("Notification scheduled successfully", notificationId)
+      return true
+    } catch (error) {
+      console.error("Error scheduling notification:", error)
+      return false
+    }
   }
 
-  // Handle scroll end for AM/PM picker
-  const handleAmPmScroll = (event) => {
-    const y = event.nativeEvent.contentOffset.y
-    const index = Math.round(y / ITEM_HEIGHT)
-    const amPm = amPmOptions[Math.min(Math.max(index, 0), amPmOptions.length - 1)]
-    setSelectedAmPm(amPm)
+  const cancelNotification = async () => {
+    try {
+      const notificationId = await AsyncStorage.getItem("notificationId")
+      if (notificationId) {
+        await Notifications.cancelScheduledNotificationAsync(notificationId)
+        await AsyncStorage.removeItem("notificationId")
+        await AsyncStorage.removeItem("notificationScheduled")
+        setNotificationScheduled(false)
+        console.log("Notification cancelled successfully")
+      } else {
+        console.log("No notification ID found to cancel.")
+      }
+    } catch (error) {
+      console.error("Error cancelling notification:", error)
+    }
+  }
+
+  const handleSleepNow = async () => {
+    if (!selectedCycle) {
+      alert("Please select the number of sleep cycles.")
+      return
+    }
+
+    const wakeUpTime = calculateWakeTime(selectedCycle)
+
+    if (wakeUpTime) {
+      const isScheduled = await scheduleNotification(wakeUpTime)
+      if (isScheduled) {
+        navigation.navigate("SleepConfirmation", { wakeUpTime })
+      } else {
+        alert("Failed to schedule notification.")
+      }
+    } else {
+      alert("Could not calculate wake-up time.")
+    }
+  }
+
+  // Update the calculateWakeTime function to ensure it's within 90 minutes of target wake-up time
+  // Add this function after the existing calculateWakeTime function:
+
+  const calculateWakeTime = (cycles) => {
+    const now = new Date()
+
+    // Get target wake-up time from the other tab
+    const targetWakeTime = new Date()
+    let targetHour = Number.parseInt(directHour || "7", 10)
+    if (directAmPm === "PM" && targetHour !== 12) {
+      targetHour += 12
+    } else if (directAmPm === "AM" && targetHour === 12) {
+      targetHour = 0
+    }
+    targetWakeTime.setHours(targetHour)
+    targetWakeTime.setMinutes(Number.parseInt(directMinute || "0", 10))
+    targetWakeTime.setSeconds(0)
+
+    // If target is earlier than now, move to next day
+    if (targetWakeTime < now) {
+      targetWakeTime.setDate(targetWakeTime.getDate() + 1)
+    }
+
+    // Calculate wake time based on cycles
+    let wakeTime = new Date(now.getTime() + cycles * 90 * 60 * 1000)
+
+    // If wake time is more than 90 minutes after target, adjust to be within 90 minutes before target
+    const maxDiff = 90 * 60 * 1000 // 90 minutes in milliseconds
+    if (wakeTime > targetWakeTime) {
+      // Find the closest number of cycles that ends before target time
+      while (wakeTime > targetWakeTime) {
+        cycles--
+        if (cycles < 1) {
+          cycles = 1
+          break
+        }
+        wakeTime = new Date(now.getTime() + cycles * 90 * 60 * 1000)
+      }
+    } else if (targetWakeTime - wakeTime > maxDiff) {
+      // If wake time is more than 90 minutes before target, adjust to be within 90 minutes
+      while (targetWakeTime - wakeTime > maxDiff && cycles < 10) {
+        cycles++
+        wakeTime = new Date(now.getTime() + cycles * 90 * 60 * 1000)
+      }
+    }
+
+    const wakeHour = wakeTime.getHours() % 12 || 12
+    const wakeMinute = String(Math.floor(wakeTime.getMinutes() / 5) * 5).padStart(2, "0")
+    const wakeAmPm = wakeTime.getHours() >= 12 ? "PM" : "AM"
+
+    // Update selected cycle to match the adjusted time
+    setSelectedCycle(cycles)
+
+    return `${wakeHour}:${wakeMinute} ${wakeAmPm}`
   }
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>EarlyBird</Text>
+      {/* Sleep Now Tab */}
 
-      <View style={styles.optionToggle}>
-        <Animated.View
-          style={[
-            styles.optionSelector,
-            {
-              left: optionAnimation.interpolate({
-                inputRange: [0, 1],
-                outputRange: ["0%", "50%"],
-              }),
-            },
-          ]}
-        />
-        <TouchableOpacity
-          style={[styles.optionButton, activeOption === "wakeup" && styles.activeOption]}
-          onPress={() => switchOption("wakeup")}
-        >
-          <Text style={[styles.optionText, activeOption === "wakeup" && styles.activeOptionText]}>
-            Set Wake-Up Time
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.optionButton, activeOption === "sleepnow" && styles.activeOption]}
-          onPress={() => switchOption("sleepnow")}
-        >
-          <Text style={[styles.optionText, activeOption === "sleepnow" && styles.activeOptionText]}>Sleep Now</Text>
+      {/* Remove the "Sleep Now" title and rearrange the Sleep Now tab layout
+// Replace the sleepNowContainer section with this updated version: */}
+
+      <View style={styles.sleepNowContainer}>
+        <Text style={styles.infoText}>
+          EarlyBird will calculate the optimal wake-up time based on complete sleep cycles (90 minutes each).
+        </Text>
+
+        {/* Predicted wake-up time display */}
+        <View style={styles.predictedTimeContainer}>
+          <Text style={styles.predictedTimeLabel}>Predicted Wake-Up Time:</Text>
+          <Text style={styles.predictedTimeValue}>{calculateWakeTime(selectedCycle)}</Text>
+        </View>
+
+        <View style={styles.sleepCyclesContainer}>
+          <View style={styles.sleepCyclesDiagram}>
+            {[1, 2, 3, 4, 5].map((cycle) => (
+              <TouchableOpacity
+                key={cycle}
+                style={[styles.sleepCycle, selectedCycle === cycle && styles.selectedCycle]}
+                onPress={() => {
+                  setSelectedCycle(cycle)
+                }}
+              >
+                <Text style={[styles.cycleNumber, selectedCycle === cycle && styles.selectedCycleText]}>{cycle}</Text>
+              </TouchableOpacity>
+            ))}
+            <TouchableOpacity
+              style={[styles.sleepCycle, selectedCycle === 6 && styles.selectedCycle]}
+              onPress={() => {
+                setSelectedCycle(6)
+              }}
+            >
+              <Text style={[styles.cycleNumber, styles.optionalCycle, selectedCycle === 6 && styles.selectedCycleText]}>
+                6
+              </Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.cyclesLabel}>Sleep Cycles</Text>
+        </View>
+
+        <TouchableOpacity style={styles.button} onPress={handleSleepNow}>
+          <Text style={styles.buttonText}>Sleep Now</Text>
         </TouchableOpacity>
       </View>
-
-      {activeOption === "wakeup" ? (
-        <View style={styles.timeContainer}>
-          <Text style={styles.label}>When would you like to wake up?</Text>
-
-          <View style={styles.directInputContainer}>
-            <View style={styles.directInputRow}>
-              <View style={styles.directInputField}>
-                <Text style={styles.directInputLabel}>Hour</Text>
-                <TextInput
-                  style={styles.directInputText}
-                  keyboardType="number-pad"
-                  maxLength={2}
-                  value={String(directHour)}
-                  onChangeText={handleHourChange}
-                  placeholder="00"
-                  placeholderTextColor="#999"
-                />
-              </View>
-
-              <Text style={styles.directInputSeparator}>:</Text>
-
-              <View style={styles.directInputField}>
-                <Text style={styles.directInputLabel}>Minute</Text>
-                <TextInput
-                  style={styles.directInputText}
-                  keyboardType="number-pad"
-                  maxLength={2}
-                  value={String(directMinute)}
-                  onChangeText={handleMinuteChange}
-                  placeholder="00"
-                  placeholderTextColor="#999"
-                />
-              </View>
-
-              <View style={styles.directInputField}>
-                <Text style={styles.directInputLabel}>AM/PM</Text>
-                <TouchableOpacity
-                  style={styles.amPmToggle}
-                  onPress={() => setDirectAmPm(directAmPm === "AM" ? "PM" : "AM")}
-                >
-                  <Text style={styles.amPmToggleText}>{directAmPm}</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-
-          <Text style={styles.infoText}>
-            EarlyBird will wake you at the optimal time before {directHour}:{directMinute.padStart(2, "0")} {directAmPm}
-          </Text>
-
-          <TouchableOpacity style={styles.button} onPress={handleSetAlarm}>
-            <Text style={styles.buttonText}>Set Wake-Up Time</Text>
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <View style={styles.sleepNowContainer}>
-          <Text style={styles.label}>Sleep Now</Text>
-          <Text style={styles.infoText}>
-            EarlyBird will calculate the optimal wake-up time based on 5-6 complete sleep cycles (7.5-9 hours).
-          </Text>
-          <View style={styles.sleepCyclesContainer}>
-            <View style={styles.sleepCyclesDiagram}>
-              {[1, 2, 3, 4, 5].map((cycle) => (
-                <View key={cycle} style={styles.sleepCycle}>
-                  <Text style={styles.cycleNumber}>{cycle}</Text>
-                </View>
-              ))}
-              <View style={styles.sleepCycle}>
-                <Text style={[styles.cycleNumber, styles.optionalCycle]}>6</Text>
-              </View>
-            </View>
-            <Text style={styles.cyclesLabel}>Sleep Cycles</Text>
-          </View>
-          <TouchableOpacity style={styles.button} onPress={handleSleepNow}>
-            <Text style={styles.buttonText}>Sleep Now</Text>
-          </TouchableOpacity>
-        </View>
-      )}
     </View>
   )
 }
@@ -257,80 +205,25 @@ const SleepSetup = ({ onStartSleep }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#0A1A3B", // Dark blue evening theme
     padding: 20,
-    justifyContent: "center",
+    backgroundColor: "#2c3e50",
+  },
+  sleepNowContainer: {
+    alignItems: "center",
+    marginTop: 20,
   },
   title: {
     fontSize: 24,
     fontWeight: "bold",
-    color: "#FFFFFF",
-    textAlign: "center",
-    marginBottom: 40,
-  },
-  optionToggle: {
-    flexDirection: "row",
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
-    borderRadius: 12,
-    marginBottom: 30,
-    position: "relative",
-    height: 50,
-  },
-  optionSelector: {
-    position: "absolute",
-    width: "50%",
-    height: "100%",
-    backgroundColor: "rgba(123, 104, 238, 0.3)",
-    borderRadius: 12,
-    zIndex: 0,
-  },
-  optionButton: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    zIndex: 1,
-  },
-  activeOption: {
-    fontWeight: "bold",
-  },
-  optionText: {
-    color: "rgba(255, 255, 255, 0.7)",
-    fontSize: 14,
-  },
-  activeOptionText: {
-    color: "#FFFFFF",
-    fontWeight: "bold",
-  },
-  timeContainer: {
-    marginBottom: 30,
-  },
-  sleepNowContainer: {
-    alignItems: "center",
-    marginBottom: 30,
-  },
-  label: {
-    fontSize: 16,
-    color: "#FFFFFF",
+    color: "#fff",
     marginBottom: 20,
-    textAlign: "center",
   },
   infoText: {
     color: "#B8C4D9",
     textAlign: "center",
-    marginVertical: 30,
+    marginTop: 20,
+    marginBottom: 15,
     paddingHorizontal: 20,
-  },
-  button: {
-    backgroundColor: "#7B68EE",
-    paddingVertical: 15,
-    borderRadius: 8,
-    alignItems: "center",
-    width: "100%",
-  },
-  buttonText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "500",
   },
   sleepCyclesContainer: {
     alignItems: "center",
@@ -344,64 +237,59 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "rgba(123, 104, 238, 0.3)",
+    backgroundColor: "#3498db",
     justifyContent: "center",
     alignItems: "center",
     marginHorizontal: 5,
   },
+  selectedCycle: {
+    backgroundColor: "#e74c3c",
+  },
   cycleNumber: {
-    color: "#FFFFFF",
+    color: "#fff",
+    fontSize: 16,
+  },
+  selectedCycleText: {
+    color: "#fff",
     fontWeight: "bold",
   },
   optionalCycle: {
-    color: "rgba(255, 255, 255, 0.5)",
+    fontSize: 14,
   },
   cyclesLabel: {
-    color: "#B8C4D9",
-    marginTop: 5,
+    fontSize: 14,
+    color: "#fff",
   },
-  directInputContainer: {
-    marginBottom: 30,
-  },
-  directInputRow: {
-    flexDirection: "row",
-    justifyContent: "center",
+  button: {
+    backgroundColor: "#27ae60",
+    padding: 15,
+    borderRadius: 10,
+    marginTop: 20,
+    width: "80%",
     alignItems: "center",
   },
-  directInputField: {
-    alignItems: "center",
-    width: 80,
+  buttonText: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "bold",
   },
-  directInputLabel: {
+  predictedTimeContainer: {
+    marginBottom: 20,
+    alignItems: "center",
+    backgroundColor: "rgba(123, 104, 238, 0.1)",
+    padding: 15,
+    borderRadius: 10,
+    width: "100%",
+  },
+  predictedTimeLabel: {
     color: "#B8C4D9",
-    fontSize: 12,
+    fontSize: 14,
     marginBottom: 5,
   },
-  directInputText: {
-    height: 50,
-    width: 70,
-    backgroundColor: "rgba(255, 255, 255, 0.05)",
-    borderRadius: 8,
-    color: "#FFFFFF",
-    fontSize: 20,
-    textAlign: "center",
-  },
-  directInputSeparator: {
+  predictedTimeValue: {
     color: "#FFFFFF",
     fontSize: 24,
-    marginHorizontal: 5,
-  },
-  amPmToggle: {
-    height: 50,
-    width: 70,
-    backgroundColor: "rgba(255, 255, 255, 0.05)",
-    borderRadius: 8,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  amPmToggleText: {
-    color: "#FFFFFF",
-    fontSize: 20,
+    fontWeight: "bold",
   },
 })
 

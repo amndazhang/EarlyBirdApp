@@ -18,6 +18,7 @@ const SleepAnalytics = ({ sleepData, sleepRating, onReset }) => {
     timeAsleep: "08:00:00",
     startTime: new Date(Date.now() - 28800000), // 8 hours ago
     endTime: new Date(),
+    completedCycles: 5, // Default to 5 completed cycles
     stageData: [
       { time: 0, stage: "Awake" },
       { time: 15, stage: "Light" },
@@ -152,6 +153,14 @@ const SleepAnalytics = ({ sleepData, sleepRating, onReset }) => {
     return `${hours}h ${minutes}m`
   }
 
+  // Get sleep cycle quality description
+  const getSleepCycleQuality = (cycles) => {
+    if (cycles >= 5) return "Excellent! You completed 5 or more sleep cycles."
+    if (cycles >= 4) return "Good! You completed 4 sleep cycles."
+    if (cycles >= 3) return "Fair. You completed 3 sleep cycles."
+    return "You may not feel fully rested with fewer than 3 complete sleep cycles."
+  }
+
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -190,6 +199,35 @@ const SleepAnalytics = ({ sleepData, sleepRating, onReset }) => {
               <Text style={styles.statLabel}>Your Rating</Text>
             </View>
           </View>
+        </View>
+
+        {/* Sleep Cycles Section */}
+        <View style={styles.cyclesCard}>
+          <Text style={styles.cardTitle}>Sleep Cycles</Text>
+          <View style={styles.cyclesContainer}>
+            {[1, 2, 3, 4, 5, 6].map((cycle) => (
+              <View
+                key={cycle}
+                style={[
+                  styles.cycleCircle,
+                  cycle <= data.completedCycles ? styles.completedCycle : styles.incompleteCycle,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.cycleNumber,
+                    cycle <= data.completedCycles ? styles.completedCycleText : styles.incompleteCycleText,
+                  ]}
+                >
+                  {cycle}
+                </Text>
+              </View>
+            ))}
+          </View>
+          <Text style={styles.cyclesDescription}>{getSleepCycleQuality(data.completedCycles)}</Text>
+          <Text style={styles.cyclesInfo}>
+            Each sleep cycle lasts approximately 90 minutes and includes light, deep, and REM sleep.
+          </Text>
         </View>
 
         <View style={styles.stagesCard}>
@@ -277,31 +315,6 @@ const SleepAnalytics = ({ sleepData, sleepRating, onReset }) => {
               withHorizontalLines={true}
               withVerticalLabels={true}
               withHorizontalLabels={false}
-              // Custom rendering for the line
-              renderDotContent={({ x, y, index, indexData }) => {
-                if (index === 0 || index === validStageData.length - 1) {
-                  return null
-                }
-
-                // Only show some dots to avoid clutter
-                if (index % 3 !== 0) return null
-
-                return (
-                  <View
-                    key={index}
-                    style={[
-                      styles.tooltipDot,
-                      {
-                        top: y - 20,
-                        left: x - 30,
-                        backgroundColor: chartData.datasets[0].colors[index],
-                      },
-                    ]}
-                  >
-                    <Text style={styles.tooltipText}>{validStageData[index].stage}</Text>
-                  </View>
-                )
-              }}
             />
           </View>
 
@@ -400,6 +413,58 @@ const styles = StyleSheet.create({
   statLabel: {
     fontSize: 14,
     color: "#666666",
+  },
+  cyclesCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  cyclesContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 15,
+    paddingHorizontal: 10,
+  },
+  cycleCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  completedCycle: {
+    backgroundColor: "#7B68EE",
+  },
+  incompleteCycle: {
+    backgroundColor: "rgba(123, 104, 238, 0.2)",
+  },
+  cycleNumber: {
+    fontWeight: "bold",
+    fontSize: 14,
+  },
+  completedCycleText: {
+    color: "#FFFFFF",
+  },
+  incompleteCycleText: {
+    color: "#999999",
+  },
+  cyclesDescription: {
+    fontSize: 14,
+    color: "#333333",
+    textAlign: "center",
+    marginBottom: 10,
+  },
+  cyclesInfo: {
+    fontSize: 12,
+    color: "#666666",
+    fontStyle: "italic",
+    textAlign: "center",
   },
   stagesCard: {
     backgroundColor: "#FFFFFF",
