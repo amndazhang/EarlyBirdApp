@@ -1,7 +1,8 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions, Modal } from "react-native"
+import { View, Button, Text, StyleSheet, TouchableOpacity, Animated, Dimensions, Modal } from "react-native"
+import PushNotification from 'react-native-push-notification';
 
 const { width, height } = Dimensions.get("window")
 
@@ -101,50 +102,75 @@ const SleepMonitoring = ({ wakeUpTime, startTime, onComplete }) => {
 
     return `${hours}:${minutes < 10 ? "0" + minutes : minutes} ${ampm}`
   }
+    
+    useEffect(() => {
+      // Configure Push Notification
+      PushNotification.configure({
+        onNotification: function(notification) {
+          console.log('NOTIFICATION:', notification);
+        },
+      });
+    }, []);
+    const scheduleAlarm = () => {
+      PushNotification.localNotificationSchedule({
+        message: "Your alarm is ringing!", // Notification Message
+        // Schedule this notification for 5 seconds from now
+        date: new Date(Date.now() + 5 * 1000),
+        playSound: true,
+        sound: 'default', // Use default sound
+        // You can set other properties like: title, priority, etc.
+      });
+    };
+    return (
+      <View style={styles.container}>
+        <Text style={styles.header}>Alarm Notification App</Text>
+        <Button title="Set Alarm" onPress={scheduleAlarm} />
+      </View>
+    );
 
-  // Load alarm sound
-  useEffect(() => {
-    const loadSound = async () => {
-      try {
-        // This is a placeholder - in a real app, you would load the bird chirp sound
-        // const { sound: birdSound } = await Audio.Sound.createAsync(
-        //   require('../assets/sounds/bird-chirps.mp3')
-        // );
-        // sound.current = birdSound;
-      } catch (error) {
-        console.error("Error loading sound", error)
-      }
-    }
-
-    loadSound()
-
-    return () => {
-      if (sound.current) {
-        sound.current.unloadAsync()
-      }
-    }
-  }, [])
+//  // Load alarm sound
+//  useEffect(() => {
+//    const loadSound = async () => {
+//      try {
+//        // This is a placeholder - in a real app, you would load the bird chirp sound
+//        // const { sound: birdSound } = await Audio.Sound.createAsync(
+//        //   require('../assets/sounds/bird-chirps.mp3')
+//        // );
+//        // sound.current = birdSound;
+//      } catch (error) {
+//        console.error("Error loading sound", error)
+//      }
+//    }
+//
+//    loadSound()
+//
+//    return () => {
+//      if (sound.current) {
+//        sound.current.unloadAsync()
+//      }
+//    }
+//  }, [])
 
   // Play alarm sound
-  const playAlarm = async () => {
-    try {
-      if (sound.current) {
-        await sound.current.playAsync()
-      }
-    } catch (error) {
-      console.error("Error playing sound", error)
-    }
-  }
-
-  const stopAlarm = async () => {
-    try {
-      if (sound.current) {
-        await sound.current.stopAsync()
-      }
-    } catch (error) {
-      console.error("Error stopping sound", error)
-    }
-  }
+//  const playAlarm = async () => {
+//    try {
+//      if (sound.current) {
+//        await sound.current.playAsync()
+//      }
+//    } catch (error) {
+//      console.error("Error playing sound", error)
+//    }
+//  }
+//
+//  const stopAlarm = async () => {
+//    try {
+//      if (sound.current) {
+//        await sound.current.stopAsync()
+//      }
+//    } catch (error) {
+//      console.error("Error stopping sound", error)
+//    }
+//  }
 
   // Update elapsed time and sleep data with less frequent recalculations
   useEffect(() => {
