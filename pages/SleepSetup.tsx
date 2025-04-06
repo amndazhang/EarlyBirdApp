@@ -89,10 +89,18 @@ const SleepSetup = ({ onStartSleep }) => {
     })
   }
 
-  const handleSleepNow = () => {
-    const optimalWakeTime = calculateOptimalWakeTime()
-    onStartSleep(optimalWakeTime)
-  }
+    const handleSleepNow = () => {
+      // For "Sleep Now", we'll use the current time + 8 hours as default
+      const now = new Date()
+      const wakeHour = (now.getHours() + 8) % 12 || 12 // Convert to 12-hour format
+      const wakeAmPm = now.getHours() + 8 >= 12 ? "PM" : "AM"
+
+      onStartSleep({
+        hour: wakeHour,
+        minute: now.getMinutes(),
+        amPm: wakeAmPm,
+      })
+    }
 
   const switchOption = (option) => {
     setActiveOption(option)
