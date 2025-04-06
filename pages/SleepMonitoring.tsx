@@ -108,21 +108,21 @@ const SleepMonitoring = ({ wakeUpTime, startTime, onComplete }) => {
     // Load sound file (must be added to Xcode project)
     const birdSound = new Sound('assets/bird-chirps.mp3', Sound.MAIN_BUNDLE, (error) => {
       if (error) {
-        console.log('Failed to load sound:', error);
+//        console.log('Failed to load sound:', error);
         return;
       }
-      soundRef.current = birdSound;
-      console.log('Sound loaded');
+//      soundRef.current = birdSound;
+//      console.log('Sound loaded');
     });
 
     return () => {
-      if (soundRef.current) {
-        soundRef.current.release(); // properly release native resources
-        console.log('Sound released');
-      }
-      if (alarmTimeout) {
-        clearTimeout(alarmTimeout);
-      }
+//      if (soundRef.current) {
+////        soundRef.current.release(); // properly release native resources
+////        console.log('Sound released');
+//      }
+//      if (alarmTimeout) {
+//        clearTimeout(alarmTimeout);
+//      }
     };
     }, []);
 
@@ -146,13 +146,13 @@ const SleepMonitoring = ({ wakeUpTime, startTime, onComplete }) => {
     }
     };
 
-    const setAlarm = (delayInMs) => {
-    const timeout = setTimeout(() => {
-      playAlarm();
-    }, delayInMs);
-    setAlarmTimeout(timeout);
-    console.log(`Alarm set for ${delayInMs / 1000} seconds`);
-    };
+//    const setAlarm = (delayInMs) => {
+//    const timeout = setTimeout(() => {
+//      playAlarm();
+//    }, delayInMs);
+//    setAlarmTimeout(timeout);
+//    console.log(`Alarm set for ${delayInMs / 1000} seconds`);
+//    };
     
   // Update elapsed time and sleep data with less frequent recalculations
   useEffect(() => {
